@@ -1,0 +1,186 @@
+!pip install Flask==3.0.0 pyngrok==7.1.2
+
+!pip install line-bot-sdk
+
+!pip3 install speechrecognition pydub
+
+!apt install ffmpeg
+
+Line_access_token='***'
+Line_Channel_secret='***'
+
+#取得ngrok網址
+
+ngrok_key = "***"
+
+port = 5000
+
+from pyngrok import ngrok
+
+ngrok.set_auth_token(ngrok_key)
+
+url_ngrok=ngrok.connect(port).public_url
+
+print('url:',url_ngrok)
+
+#更新line webhook api網址為新ngrok網址
+
+line_put_endpoint_url = "https://api.line.me/v2/bot/channel/webhook/endpoint"
+
+data = {"endpoint": url_ngrok + '/callback'}
+
+headers = {
+
+  "Authorization": "Bearer " + Line_access_token ,
+
+  "Content-Type": "application/json"
+
+}
+
+import json
+
+import requests
+
+import time
+
+while(1):
+
+  time.sleep(1) #等候1秒
+
+  res = requests.put(line_put_endpoint_url, headers=headers, json=data)
+
+    # 檢查回應狀態碼
+
+  if res.status_code == 200:
+
+    print("WebhookURL更新成功！")
+
+    break
+
+  else:
+
+    print("WebhookURL更新失敗")
+
+from flask import Flask
+from flask import *
+
+from linebot import (LineBotApi, WebhookHandler)
+from linebot.exceptions import ( InvalidSignatureError)
+from linebot.models import *
+
+import speech_recognition as sr #
+from pydub import AudioSegment
+
+
+#Messaging API settings/Channel access token
+line_bot_api = LineBotApi(Line_access_token)
+
+#Basic settings/Channel secret
+handler = WebhookHandler(Line_Channel_secret)
+
+app = Flask(__name__)
+
+
+@app.route("/")
+def home():
+  return "<h1>我是大帥哥</h1>"
+
+@app.route("/callback", methods=['POST'])
+def callback():
+  # get X-Line-Signature header value
+  signature = request.headers['X-Line-Signature']
+
+  # get request body as text
+  body = request.get_data(as_text=True)
+  app.logger.info("Request body: " + body)
+
+  # handle webhook body
+  try:
+    handler.handle(body, signature)
+  except InvalidSignatureError:
+    abort(400)
+
+#實際處理訊息的部份
+
+@handler.add(MessageEvent) #刪除後面的message=TextMessage
+
+def handle_message(event):
+
+  print('語音訊息...')
+
+  if event.message.type=='audio': #如果是語音訊息
+
+    print('接收語音訊息')
+
+    audio_content = line_bot_api.get_message_content(event.message.id)
+
+    path='/content/sample_data/sound.m4a' #將語音存入路徑檔案
+
+    with open(path, 'wb') as fd:
+
+      for chunk in audio_content.iter_content():
+
+        fd.write(chunk)
+
+    #M4A toWAV
+
+    sound = AudioSegment.from_file_using_temporary_files('/content/sample_data/sound.m4a')
+
+    pathwav = '/content/sample_data/sound.wav'
+
+    sound.export(pathwav, format="wav")
+
+    #辨識內容
+
+    r = sr.Recognizer()
+
+    with sr.AudioFile(pathwav) as source:
+
+      audiowav = r.record(source)
+
+      textMSG = r.recognize_google(audiowav ,language='zh-Hant') #設定要以什麼文字轉換
+
+      print(textMSG)
+
+    #辨識內容回傳關鍵字
+
+#處理接收到的語音
+
+    if '地址' in textMSG or '地點' in textMSG:
+
+      msg='感謝您的詢問，本公司地址在高雄市楠梓區大學路1號'
+
+      s=StickerSendMessage(package_id='446',sticker_id='1994')
+
+    elif '時間' in textMSG or '時段' in textMSG:
+
+      msg='感謝您的詢問，本公司的營業時間是09:00~17:00'
+
+      s=StickerSendMessage(package_id='446',sticker_id='2001')
+
+    elif '電話' in textMSG:
+
+      msg='感謝您的詢問，本公司的聯絡電話:07-12345678'
+
+      s=StickerSendMessage(package_id='6325',sticker_id='10979905')
+
+    else: #應聲蟲訊息
+
+      msg=textMSG
+
+      s=StickerSendMessage(package_id='1',sticker_id='1')
+
+    replyMsg=[TextSendMessage(text='歡迎光臨'),TextSendMessage(text=msg),s]
+
+    line_bot_api.reply_message(
+
+        event.reply_token,
+
+        replyMsg
+
+    )
+
+if __name__ == "__main__":
+
+  app.run()
+
