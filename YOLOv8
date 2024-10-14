@@ -1,0 +1,159 @@
+!nvidia-smi
+
+#!pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+import torch
+
+print("pytorch版本：",torch.__version__)
+
+if torch.cuda.is_available():
+
+  print("cuda是否可用：",torch.cuda.is_available())
+
+  print("GPU數量：",torch.cuda.device_count())
+
+  print("cudnn是否可用：",torch.backends.cudnn.enabled)
+
+  #印出記憶體用量
+
+  print("記憶體狀態：",torch.cuda.mem_get_info())
+
+else:
+
+  print("cuda是否可用：",torch.cuda.is_available())
+
+!pip install ultralytics
+
+from ultralytics import YOLO
+
+import cv2 #載入cv2
+
+model = YOLO('yolov8x.pt')  # 物件辨識模型
+
+modelSeg = YOLO('yolov8x-seg.pt')  # 物件分割模型
+
+modelPose = YOLO('yolov8x-pose.pt')  # 身體姿態模型
+
+names=model.names
+
+print(names)
+
+from IPython.display import display, Javascript, Image
+
+from google.colab.output import eval_js
+
+from google.colab.patches import cv2_imshow
+
+from base64 import b64decode, b64encode
+
+import numpy as np
+
+import PIL
+
+import io
+
+import html
+
+import urllib.request
+
+#輸入你想看的圖片網址
+
+url = "https://s.yimg.com/ny/api/res/1.2/UJr7D0e02bK9OyaWS72Muw--/YXBwaWQ9aGlnaGxhbmRlcjt3PTY0MDtoPTQxNw--/https://media.zenfs.com/ko/nextapple_com_761/5b8496afc365137ec0a8f29aba233924"
+
+urllib.request.urlretrieve(url, "image.jpg")
+
+img_test = cv2.imread("image.jpg")
+
+cv2_imshow(img_test) #顯示下載的圖片
+
+results = model.predict(img_test,verbose=False)
+
+#results = modelSeg.predict(img_test,verbose=False)
+
+#results = modelPose.predict(img_test,verbose=False)
+
+annotated_frame = results[0].plot()
+
+cv2_imshow(annotated_frame)
+
+cv2.imwrite('annotated_frame.jpg',annotated_frame)#存檔
+
+bboxes = results[0].boxes
+
+for box in bboxes:
+
+  detections=(box.data)
+
+  print(detections)
+
+bboxes = results[0].boxes
+
+label_counts={}
+
+for box in bboxes:
+
+  detections=(box.data)
+
+  #找出物件座標，轉換為整數
+
+  x1,y1,x2,y2=int(detections[0][0]),int(detections[0][1]),int(detections[0][2]),int(detections[0][3])
+
+  #找出物件信任度
+
+  p=round(float(detections[0][4]),2)
+
+  #物件名稱
+
+  l=names[int(detections[0][5])]
+
+  print(x1,y1,x2,y2,p,l)
+
+  if l in label_counts:
+
+    label_counts[l]+=1
+
+  else:
+
+    label_counts[l]=1
+
+print(label_counts)
+
+try:
+
+  results = take_photo('photo.jpg')
+
+except Exception as err:
+
+  print(str(err))
+
+# start streaming video from webcam
+
+video_stream()
+
+# label for video
+
+label_html = 'Capturing...'
+
+# initialze bounding box to empty
+
+bbox = ''
+
+count = 0
+
+while True:
+
+    js_reply = video_frame(label_html, bbox)
+
+    if not js_reply:
+
+        break
+
+    # convert JS response to OpenCV Image
+
+    frame = js_to_image(js_reply["img"])
+
+    results = model.predict(frame,verbose=False)
+
+    annotated_frame = results[0].plot()
+
+    imshow('t',annotated_frame)
