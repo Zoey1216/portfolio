@@ -1,0 +1,435 @@
+!pip install Flask==3.0.0 pyngrok==7.1.2
+
+!pip install line-bot-sdk
+
+!pip install openai==0.28
+
+import openai    # 設定金鑰
+
+openai.api_key = "***"
+
+Line_access_token='***'
+
+Line_Channel_secret='***'
+
+#連線google雲端硬碟
+
+from google.colab import drive
+
+drive.mount('/content/drive')
+
+!pip install db-sqlite3
+
+import pandas as p
+
+import sqlite3
+
+from datetime import datetime
+
+#指定資料庫存放位置
+
+%cd drive/MyDrive/Colab\ Notebooks/
+
+#取得ngrok網址
+
+ngrok_key = "2d4ftFDFggbvCWRXRNzPIbeZeRD_26jXN8cnYoKptTxTM42aD"
+
+port = 5000
+
+from pyngrok import ngrok
+
+ngrok.set_auth_token(ngrok_key)
+
+url_ngrok=ngrok.connect(port).public_url
+
+print('url:',url_ngrok)
+
+#更新line webhook api網址為新ngrok網址
+
+line_put_endpoint_url = "https://api.line.me/v2/bot/channel/webhook/endpoint"
+
+data = {"endpoint": url_ngrok + '/callback'}
+
+headers = {
+
+  "Authorization": "Bearer " + Line_access_token ,
+
+  "Content-Type": "application/json"
+
+}
+import json
+
+import requests
+
+import time
+
+while(1):
+
+  time.sleep(1) #等候1秒
+
+  res = requests.put(line_put_endpoint_url, headers=headers, json=data)
+
+    # 檢查回應狀態碼
+
+  if res.status_code == 200:
+
+    print("WebhookURL更新成功！")
+
+    break
+
+  else:
+
+    print("WebhookURL更新失敗")
+
+from flask import Flask
+
+from flask import *
+
+#載入Line SDK
+
+from linebot import LineBotApi, WebhookHandler
+
+from linebot.exceptions import InvalidSignatureError
+
+from linebot.models import *
+
+line_bot_api =LineBotApi(Line_access_token)
+
+handler = WebhookHandler(Line_Channel_secret)
+
+app = Flask(__name__)
+
+@app.route("/")
+
+def hello():
+
+    return "Hi!"
+
+@app.route("/callback", methods=['POST'])
+
+def callback():
+
+  #取得簽章
+
+  signature = request.headers['X-Line-Signature']
+
+  #取得訊息內容
+
+  body = request.get_data(as_text=True)
+
+  #紀錄取得資料
+
+  app.logger.info("Request body: " + body)
+
+  #回覆訊息給機器人
+
+  try:
+
+    handler.handle(body, signature)#回覆訊息
+
+  except InvalidSignatureError:
+
+    abort(400)#回覆錯誤代碼
+
+  return 'OK'
+
+#實際處理
+
+@handler.add(MessageEvent, message=TextMessage)
+
+def handle_message(event):
+
+  #取得使用者資料
+
+  UserId = event.source.user_id
+
+  profile = line_bot_api.get_profile(UserId)
+
+  #print('profile' ,profile )
+
+  UserName=profile.display_name
+
+  UserPic=profile.picture_url
+
+  UserStatus=profile.status_message
+
+  print("UserId=",UserId,",UserName=",UserName,",UserPic=",UserPic,",UserStatus=",UserStatus)
+
+  sendText= event.message.text
+
+  #開啟資料庫
+
+  db = sqlite3.connect("sqlite.db")
+
+  #結束對話
+
+  if sendText =="結束對話":
+
+    replyMsg=[TextSendMessage(text='好的，謝謝，歡迎您再來')]
+
+    line_bot_api.reply_message(event.reply_token,#回覆密碼
+
+                replyMsg)#訊息
+
+    #刪除資料庫
+
+    rs = db.execute("delete from TEMP_Conversation WHERE userid = '" + UserId + "'")
+
+    db.commit()
+
+    return
+
+  #讀取產品內容
+
+  rs = db.execute("SELECT * from product")
+
+  pjson=""
+
+  for rc in rs:
+
+    #[{'id':C001,'name':'狗罐頭'...]},{},{}]
+
+    p_text = "{'id':'" + rc[0] + "','namen':'" + rc[1] + "','spec':'" + rc[2] + "','price':" + str(rc[3]) + ",'quantity':" + str(rc[4]) + ".'remark':'" + rc[5] +"'}"
+
+    pjson = pjson + ',' + p_text
+
+  pjson = "[" +pjson + "]"
+
+  print(pjson)
+
+  #讀取對話紀錄
+
+  conversation =[]
+
+  rs = db.execute("SELECT * from TEMP_Conversation where userid='" + UserId + "'")
+
+  for rc in rs:
+
+    conversation.append ({"role": rc[1], "content": rc[2] })
+
+  print('conversation',conversation)
+
+  #openai用
+
+  reply = openai.ChatCompletion.create(
+
+    model = "gpt-3.5-turbo",     # 指定要使用的模型
+
+    messages = [
+
+        {"role":"system", "content": "你是公司接電話的員工，負責回答客人的電話，與本公司營業時間、地點及營業項目有關的問題"},
+
+        {"role":"system", "content": "本公司的產品及服務為以下json格式內容:" + pjson },
+
+        {"role":"user", "content": "請問營業時間"}, #指定角色與訊息內容
+
+        {"role":"assistant", "content": "營業時間是9點至17點"},
+
+        {"role":"user", "content": "請問貴公司地址"},
+
+        {"role":"assistant", "content": "我們公司位在高雄市楠梓區卓越路2號"},
+
+        {"role":"user", "content": sendText},
+
+    ] + conversation
+
+  )
+
+  replyText=(reply.choices[0].message.content)
+
+  print('replyText:',replyText)
+
+  #存入資料庫
+
+  sqlString = "insert into TEMP_Conversation('userid', 'role', 'content') values ('" + UserId + "','user','" + sendText + "'),('" + UserId + "','assistant','" + replyText + "')"
+
+  print('sqlString=',sqlString)
+
+  rs = db.execute(sqlString)
+
+  db.commit()
+
+  db.close()
+
+  replyMsg=[TextSendMessage(text=replyText)]
+
+  line_bot_api.reply_message(event.reply_token,#回覆密碼
+
+                replyMsg)#訊息
+
+if __name__ == '__main__':
+
+    app.run(port = port)
+
+from flask import Flask
+
+from flask import *
+
+from linebot import (LineBotApi, WebhookHandler)
+
+from linebot.exceptions import ( InvalidSignatureError)
+
+from linebot.models import *
+
+import time
+
+#Messaging API settings/Channel access token
+
+line_bot_api = LineBotApi(Line_access_token)
+
+#Basic settings/Channel secret
+
+handler = WebhookHandler(Line_Channel_secret)
+
+app = Flask(__name__)
+
+@app.route("/")
+
+def home():
+
+  return "<h1>我是大帥哥</h1>"
+
+@app.route("/callback", methods=['POST'])
+
+def callback():
+
+  # get X-Line-Signature header value
+
+  signature = request.headers['X-Line-Signature']
+
+  # get request body as text
+
+  body = request.get_data(as_text=True)
+
+  app.logger.info("Request body: " + body)
+
+  # handle webhook body
+
+  try:
+
+      handler.handle(body, signature)
+
+  except InvalidSignatureError:
+
+      abort(400)
+
+  return 'OK'
+
+#實際處理訊息的部份
+
+@handler.add(MessageEvent, message=TextMessage)
+
+def handle_message(event):
+
+  UserId = event.source.user_id
+
+  profile = line_bot_api.get_profile(UserId)
+
+  #print('profile' ,profile )
+
+  UserName=profile.display_name
+
+  UserPic=profile.picture_url
+
+  UserStatus=profile.status_message
+
+  print("UserId=",UserId,",UserName=",UserName,",UserPic=",UserPic,",UserStatus=",UserStatus)
+
+#檢查資料庫內是否有相同的UserId，若否則加入user資料庫內
+
+  #開啟資料庫
+
+  db = sqlite3.connect("sqlite.db")
+
+  #查詢user資料表
+
+  rs = db.execute("select UserId from user where UserId='" + UserId +"'")
+
+  #計算查詢結果筆數==NULL
+
+  rsCount = len(rs.fetchall())
+
+  print("rsCount=",rsCount)
+
+  #如果沒有就新增這個使用者
+
+  if rsCount==0:
+
+    rs=db.execute("insert into user(UserId,UserName,PicUrl,Degree,Remark) values('" + UserId + "','" + UserName + "','" + UserPic + "',5,'')")
+
+    db.commit()
+
+    print(UserName + " insert to db")
+
+  else:
+
+    print(UserName + " exist")
+
+    conn = sqlite3.connect('test.db')
+
+    # 定義 SQL 建立表格的語句
+
+    create_table_query = '''
+
+    CREATE TABLE IF NOT EXISTS user (
+
+        user_id PRIMARY KEY,
+
+        user_name,
+
+        user_profile_photo,
+
+        user_status_message
+
+    );
+
+    '''
+
+    # 執行建立表格的 SQL 語句
+
+    conn.execute(create_table_query)
+
+    # 提交並關閉連接
+
+    conn.commit()
+
+    conn.close()
+
+  rs = db.execute("select * from product")
+
+  for rc in rs:
+
+    print(rc[0])
+
+    print(rc[1])
+
+    print(rc[2])
+
+  rpy_text = "親愛的" + UserName + "：\n" + event.message.text
+
+  replyMsg=[ TextSendMessage(text=rpy_text)]
+
+  line_bot_api.reply_message(
+
+      event.reply_token,
+
+      replyMsg
+
+  )
+
+  #存入對話到db
+
+  conId = event.message.id
+
+  content = event.message.text
+
+  replay_cont = rpy_text
+
+  time_stamp = (datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+
+  rs=db.execute("insert into conversation(conId,userId,content,replay_cont,time) values('" + conId + "','" + UserId + "','" + content + "','" + replay_cont + "','" + time_stamp + "')")
+  db.commit()
+
+if __name__ == "__main__":
+
+  app.run()
