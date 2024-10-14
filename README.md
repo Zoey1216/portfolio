@@ -20,3 +20,6 @@ https://youtu.be/i2aeA5W1sB4
 
 ----
 
+javaFX
+
+將名字輸入後會顯示歡迎訊息
