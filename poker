@@ -1,0 +1,158 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+int * cards(int *p_last)
+{
+    srand((unsigned)time(NULL));
+    //int n =  1;
+    int total = 52;
+    int *pokers = malloc(total * sizeof(int));
+
+    // ????
+    for (int i = 0; i < total; i++)
+        pokers[i] = i + 1;
+
+    // 瘣?
+    for (int i = 0; i < total; i++)
+    {
+        int j = rand() % total;
+        int tmp = pokers[i];
+        pokers[i] = pokers[j];
+        pokers[j] = tmp;
+    }
+
+    // 閮?????敺???蝝???
+    *p_last = &(pokers[total - 1]);
+    return pokers;
+}
+
+int *counting(int i, int count, int T1, int T2, int T3)
+{
+    int point, number=i%13;
+    switch (number)
+    {
+    case 2 ... 6:
+        point =1;
+        T1++;
+        count++;
+        break;
+    case 7 ... 9:
+        point = 0;
+        T2++;
+        break;
+    case 0:
+    case 1:
+    case 10 ... 13:
+        point =-1;
+        T3++;
+        count--;
+        break;
+    }
+    int *counts = malloc(5 * sizeof(int));
+    counts[0] = point;
+    counts[1] = count;
+    counts[2] = T1;
+    counts[3] = T2;
+    counts[4] = T3;
+    return counts;
+}
+
+void display()
+{
+    int *p_last; // 摰??銝????璅???霈
+    // ?澆 card ?賢??????
+    int *pokers = cards(&p_last);
+    int last_index = p_last - pokers;
+
+    //---------------??閮剖?
+    int  total=last_index+1, i;
+    int *a, NoIn, point, count=0, T1=0, T2=0, T3=0, t ;
+    char poker[total][2];
+
+    printf( "Poker      Points     Counts     Category 1 Category 2 Category 3\n");
+    for ( int i = 0; i < total; i++ )
+    {
+        // ?斗?梯  頧?(0/1/2/3)
+        switch(((pokers[i]-1) / 13)%4)
+        {
+        case 0:
+            poker[total][0] = 'S';
+            printf("S");
+            break;
+        case 1:
+            poker[total][0] = 'H';
+            printf("H");
+            break;
+        case 2:
+            poker[total][0] = 'D';
+            printf("D");
+            break;
+        case 3:
+            poker[total][0] = 'C';
+            printf("C");
+            break;
+        }
+
+        // ?脣??摮?
+        NoIn = pokers[i] % 13;
+        switch(NoIn)
+        {
+        case 0:
+            poker[total][1] = 'K';
+            printf("K");
+            break;
+        case 1:
+            poker[total][1] = 'A';
+            printf("A");
+            break;
+        case 10:
+            poker[total][1] = 'T';
+            printf("T");
+            break;
+        case 11:
+            poker[total][1] = 'J';
+            printf("J");
+            break;
+        case 12:
+            poker[total][1] = 'Q';
+            printf("Q");
+            break;
+        default:
+            poker[total][1] = NoIn;
+            printf("%d", NoIn);
+            break;
+        }
+        printf("         ");
+
+        a=counting(*(pokers + i),count, T1, T2, T3);
+
+        if(a[0]==1)
+            printf("+%d         ",a[0]);
+        else
+            printf("%d         ",a[0]);
+
+        if(a[1]>0)
+            printf("+%d         ",a[1]);
+        else
+            printf("%d         ",a[1]);
+
+        printf("%dcards     %dcards     %dcards     ",a[2],a[3],a[4]);
+
+        count=a[1];
+        T1=a[2];
+        T2=a[3];
+        T3=a[4];
+        Sleep(1000);
+        printf("\r");
+    }
+}
+int main()
+{
+    display();
+    printf("\n");
+    system("PAUSE");
+}
+
+
