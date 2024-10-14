@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -10,11 +9,11 @@ int * cards(int *p_last)
     int total = 52;
     int *pokers = malloc(total * sizeof(int));
 
-    // ????
+    // 初始化
     for (int i = 0; i < total; i++)
         pokers[i] = i + 1;
 
-    // 瘣?
+    // 洗牌
     for (int i = 0; i < total; i++)
     {
         int j = rand() % total;
@@ -23,7 +22,7 @@ int * cards(int *p_last)
         pokers[j] = tmp;
     }
 
-    // 閮?????敺???蝝???
+    // 計算陣列最後一個元素的指標
     *p_last = &(pokers[total - 1]);
     return pokers;
 }
@@ -61,12 +60,12 @@ int *counting(int i, int count, int T1, int T2, int T3)
 
 void display()
 {
-    int *p_last; // 摰??銝????璅???霈
-    // ?澆 card ?賢??????
+    int *p_last; // 宣告一個指向指標的指標變數
+    // 呼叫 card 函式取得陣列
     int *pokers = cards(&p_last);
     int last_index = p_last - pokers;
 
-    //---------------??閮剖?
+    //---------------初始設定
     int  total=last_index+1, i;
     int *a, NoIn, point, count=0, T1=0, T2=0, T3=0, t ;
     char poker[total][2];
@@ -74,7 +73,7 @@ void display()
     printf( "Poker      Points     Counts     Category 1 Category 2 Category 3\n");
     for ( int i = 0; i < total; i++ )
     {
-        // ?斗?梯  頧?(0/1/2/3)
+        // 判斷花色  轉換(0/1/2/3)
         switch(((pokers[i]-1) / 13)%4)
         {
         case 0:
@@ -95,7 +94,7 @@ void display()
             break;
         }
 
-        // ?脣??摮?
+        // 撲克牌數字
         NoIn = pokers[i] % 13;
         switch(NoIn)
         {
@@ -154,5 +153,3 @@ int main()
     printf("\n");
     system("PAUSE");
 }
-
-
