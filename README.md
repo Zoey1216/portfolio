@@ -24,6 +24,8 @@ https://youtu.be/i2aeA5W1sB4
 
 將名字輸入後會顯示歡迎訊息
 
+![image](hello.png)
+
 ----
 
 ## LineBot- 語音訊息及關鍵字回覆
@@ -31,6 +33,8 @@ https://youtu.be/i2aeA5W1sB4
 Code中的個人資訊由****隱藏
 
 傳送語音訊息將辨識內容，若其中有關鍵字系統會自動回覆已設定好的相關資訊
+
+![image](語音辨識.png)
 
 ----
 
@@ -40,8 +44,15 @@ Code中的個人資訊由****隱藏
 
 透過OpenAI與連結資料庫，自動查詢資料庫並回覆相關問題
 
+![image](ai+db.jpg)
+
 ----
 
 ## YOLOv8
 
 使用YOLOv8進行影像辨識並將資訊統整
+
+
+![image](car.png)
+
+![image](w.png)
